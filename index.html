@@ -2,12 +2,35 @@
 <meta charset="utf-8">
 <style>
 
-.bar rect {
-  fill: steelblue;
+.option1 { 
+    stroke: steelblue; 
 }
 
-.bar1 rect {
-  fill: gray;
+.option2 { 
+    stroke: gray; 
+}
+
+path {
+    stroke-width: 2;
+    fill: none;
+}
+
+.option1.filled {
+    fill: steelblue;
+    fill-opacity: 0.2
+}
+
+.option2.filled {
+    fill: gray;
+    fill-opacity: 0.2
+}
+ 
+.axis path,
+.axis line {
+	fill: none;
+	stroke: grey;
+	stroke-width: 1;
+	shape-rendering: crispEdges;
 }
 
 </style>
@@ -15,97 +38,107 @@
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <script>
 
-var numBins = 15;
+var numBins = 30;
+var percentile = 90;
+var lowerPercentile = (1 - percentile/100)/2
+var upperPercentile = (1 + percentile/100)/2
+var processedData = [];
 
-var data = d3.range(100000).map(d3.randomBates(10));
-var data1 = d3.range(100000).map(d3.randomBates(10));
+// Generate random gaussian data
+var data = d3.range(10000).map(d3.randomBates(10)).sort();
+var data1 = d3.range(10000).map(d3.randomBates(10)).sort();
+var data1 = data1.map(function(x) {
+   return (x * 1.5) + 0.25; });
 
-var dataArray = [data, data1]
+// Combine data into an array
+var dataArray = [data, data1];
+var dataFlattened = dataArray.reduce(function(a, b) {
+  return a.concat(b); });
 
-var formatCount = d3.format(",.0f");
-
+// Make SVG to display data
 var svg = d3.select("svg"),
-    margin = {top: 10, right: 30, bottom: 30, left: 50},
+    margin = {upper: 10, right: 30, lower: 30, left: 50},
     width = +svg.attr("width") - margin.left - margin.right,
-    height = +svg.attr("height") - margin.top - margin.bottom,
-    g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    height = +svg.attr("height") - margin.upper - margin.lower,
+    g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.upper + ")");
 
+// Define x scale
 var x = d3.scaleLinear()
     .rangeRound([0, width])
-    .domain([d3.min(data), d3.max(data)])
+    .domain([d3.min(dataFlattened), d3.max(dataFlattened)])
     .nice();
 
-var bins = d3.histogram()
-    .domain(x.domain())
-    .thresholds(x.ticks(numBins))
-    (data);
-
-
-// var bins1 = d3.histogram()
-//     .domain(x.domain())
-//     .thresholds(x.ticks(numBins))
-//     (data1);
-
+// Define y scale
 var y = d3.scaleLinear()
-    .domain([0, d3.max(bins, function(d) { return (d.length/data.length); })])
+    .domain([0, 0.25])
+    // .domain([0, d3.max(bins, function(d) { return (d.length/data.length); })])
     .rangeRound([height, 0])
     .nice();
 
-var bar = g.selectAll(".bar")
-  .data(bins)
-  .enter().append("g")
-    .attr("class", "bar")
-    .attr("transform", function(d) { return "translate(" + x(d.x0) + "," + y((d.length/data.length)) + ")"; });
+// Process data
+for (var i = 0; i < dataArray.length; i++) {
+    var data = dataArray[i];
 
-bar.append("rect")
-    .attr("x", 1)
-    .attr("width", x(bins[1].x1) - x(bins[1].x0) - 2)
-    .attr("height", function(d) { return height - y(d.length/data.length); });
+    // Make histogram bins
+    var bins = d3.histogram()
+        .domain(x.domain())
+        .thresholds(x.ticks(numBins))
+        (data);
+    
+    // Find percentiles
+    var lower = d3.quantile(data, lowerPercentile);
+    var upper = d3.quantile(data, upperPercentile);  
+    
+    // Make object
+    var option = {
+        data: data,
+        bins: bins,
+        lower: lower,
+        upper: upper
+        }
 
+    // Push object into array
+    processedData.push(option)
+}
+
+for (var i = 0; i < processedData.length; i++) {
+    var option = processedData[i];
+
+    // Define line to display
+    var	line = d3.line()
+    .curve(d3.curveBasis)
+    .x(function(d) { return x((d.x0+d.x1)/2); })
+    .y(function(d) { return y((d.length)/option.data.length); });
+
+    // Add line to graph
+    g.append("path")	
+        .attr("class", "option" + (i + 1))
+        .attr("d", line(option.bins));
+    
+    // Create clip with percentile cutoffs
+    var clip1 = svg.append("svg:clipPath")
+        .attr("id", "clip" + (i + 1))
+        .append("g:rect")
+            .attr("x", 1)
+            .attr("width", x(option.upper) - x(option.lower))
+            .attr("height", height)
+            .attr("transform", "translate(" + x(option.lower) + ",0)");
+
+    // Add filled area with clip
+    g.append("path")	
+        .attr("class", "option" + (i + 1) + " filled")
+        .attr("clip-path", function(d,j) { return "url(#clip" + (i + 1) + ")"; })
+        .attr("d", line(option.bins));
+}
+
+// Add axes to graph
 g.append("g")
     .attr("class", "axis axis--x")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x).ticks(numBins));
+    .call(d3.axisBottom(x));
 
 g.append("g")
     .attr("class", "axis axis--y")
-    .call(d3.axisLeft(y).ticks(10, ".0%"));
-
-// var bar1 = g.selectAll(".bar1")
-//   .data(bins1)
-//   .enter().append("g")
-//     .attr("class", "bar1")
-//     .attr("transform", function(d) { return "translate(" + x(d.x0) + "," + y((d.length/data.length)*100) + ")"; });
-
-// bar1.append("rect")
-//     .attr("x", 1)
-//     .attr("width", x(bins1[1].x1) - x(bins1[1].x0) - 1)
-//     .attr("height", function(d) { return height - y((d.length/data.length)*100); });
-
-// bar1.append("text")
-//     .attr("dy", function(d) 
-//         {
-//             if ((d.length/data.length)*100 > 10) {
-//                 return ".75em";
-//             } else {
-//                 return "-1em";
-//             }
-//         })
-//     .attr("y", 6)
-//     .attr("x", (x(bins1[1].x1) - x(bins1[1].x0)) / 2)
-//     .attr("text-anchor", "middle")
-//     .text(function(d) 
-//         { 
-//             if ((d.length/data.length)*100 > 0) {
-//                 return formatCount((d.length/data.length)*100);
-//             } else {
-//                 return ""
-//             }
-//         });
-
-// g.append("g")
-//     .attr("class", "axis axis--x")
-//     .attr("transform", "translate(0," + height + ")")
-//     .call(d3.axisBottom(x));
+    .call(d3.axisLeft(y).ticks(6, ".0%"));
 
 </script>
