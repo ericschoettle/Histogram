@@ -58,8 +58,9 @@ path {
 
 var numBins = 30;
 var percentile = 90;
-var lowerPercentile = (1 - percentile/100)/2
-var upperPercentile = (1 + percentile/100)/2
+var selected = NaN;
+var lowerPercentile = (1 - percentile/100)/2;
+var upperPercentile = (1 + percentile/100)/2;
 var processedData = [];
 
 // Generate random gaussian data
@@ -113,6 +114,7 @@ for (var i = 0; i < dataArray.length; i++) {
     var lower = d3.quantile(data, lowerPercentile);
     var upper = d3.quantile(data, upperPercentile);  
     
+
     // Make object
     var option = {
         data: data,
@@ -125,43 +127,7 @@ for (var i = 0; i < dataArray.length; i++) {
     processedData.push(option)
 }
 
-for (var i = 0; i < processedData.length; i++) {
-    var option = processedData[i];
-
-    // Define line to display
-    var	line = d3.line()
-        .curve(d3.curveBasis)
-        .x(function(d) { return x((d.x0+d.x1)/2); })
-        .y(function(d) { return y((d.length)/option.data.length); });
-
-    // Add line to graph
-    g.append("path")	
-        .attr("class", "option" + (i + 1))
-        .attr("d", line(option.bins));
-    
-    // Create clip with percentile cutoffs
-    var clip1 = svg.append("svg:clipPath")
-        .attr("id", "clip" + (i + 1))
-        .append("g:rect")
-            .attr("x", 1)
-            .attr("width", x(option.upper) - x(option.lower))
-            .attr("height", height)
-            .attr("transform", "translate(" + x(option.lower) + ",0)");
-
-    // Add filled area with clip
-    g.append("path")	
-        .attr("class", "option" + (i + 1) + " filled")
-        .attr("clip-path", "url(#clip" + (i + 1) + ")")
-        .attr("d", line(option.bins));
-
-    // g.append("rect")
-    //     .attr("class", "option" + (i + 1) + " filled")
-    //     .attr("x", 1)
-    //     .attr("width", 30)
-    //     .attr("height", 30)
-    //     .attr("transform", "translate(700, " + (50 + 40*i) + ")");
-}
-
+// Add legend color box
 var rect = g.selectAll("rect")
     .data(processedData)
     .enter()
@@ -170,8 +136,9 @@ var rect = g.selectAll("rect")
         .attr("x", 1)
         .attr("width", 30)
         .attr("height", 30)
-        .attr("transform", function(d,i) { return "translate(700, " + (50 + 40*i) + ")"} );
+        .attr("transform", function(d,i) { return "translate(700, " + (50 + 40*i) + ")"} )
 
+// Add text to legend
 var text = g.selectAll("text")
     .data(processedData)
     .enter()
@@ -181,15 +148,75 @@ var text = g.selectAll("text")
         .text(function(d,i) { return "Option " + (i + 1) })
         .attr("font-family", "sans-serif")
         .attr("font-size", "15px")
+        .on("mouseover", selectOption)
+        .on("mouseout", deselectOption)
 
-// Add axes to graph
-g.append("g")
-    .attr("class", "axis axis--x")
-    .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x));
+displayCurves()
+displayAxes()
 
-g.append("g")
-    .attr("class", "axis axis--y")
-    .call(d3.axisLeft(y).ticks(6, ".0%"));
+function selectOption(d, i) {
+    selected = i
+    clearCurves()
+    displayAxes()
+    displayCurves()
+}
+
+function deselectOption(d, i) {
+    selected = NaN
+    clearCurves()
+    displayAxes()
+    displayCurves()
+}
+
+function displayCurves() {
+    for (var i = 0; i < processedData.length; i++) {
+        var option = processedData[i];
+        
+        if (isNaN(selected) || selected == i) {
+            // Define line to display
+            var	line = d3.line()
+                .curve(d3.curveBasis)
+                .x(function(d) { return x((d.x0+d.x1)/2); })
+                .y(function(d) { return y((d.length)/option.data.length); });
+
+            // Add line to graph
+            g.append("path")	
+                .attr("class", "option" + (i + 1))
+                .attr("d", line(option.bins));
+
+            // Create clip with percentile cutoffs
+            var clip1 = svg.append("g:clipPath")
+            .attr("id", "clip" + (i + 1))
+            .append("g:rect")
+                .attr("x", 1)
+                .attr("width", x(option.upper) - x(option.lower))
+                .attr("height", height)
+                .attr("transform", "translate(" + x(option.lower) + ",0)");
+
+            // Add filled area with clip
+            g.append("path")	
+                .attr("class", "option" + (i + 1) + " filled")
+                .attr("clip-path", "url(#clip" + (i + 1) + ")")
+                .attr("d", line(option.bins));           
+        }    
+    }
+}
+
+function displayAxes() {
+    // Add axes to graph
+    g.append("g")
+        .attr("class", "axis axis--x")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x));
+
+    g.append("g")
+        .attr("class", "axis axis--y")
+        .call(d3.axisLeft(y).ticks(6, ".0%"));
+}
+
+function clearCurves() {
+    d3.selectAll("path").remove();
+    d3.selectAll("clipPath").remove();
+}
 
 </script>
