@@ -10,19 +10,37 @@
     stroke: gray; 
 }
 
+.option3 { 
+    stroke: green; 
+}
+
+.option4 { 
+    stroke: firebrick;
+}
+
 path {
     stroke-width: 2;
     fill: none;
 }
 
+.filled {
+    fill-opacity: 0.2;
+}
+
 .option1.filled {
     fill: steelblue;
-    fill-opacity: 0.2
 }
 
 .option2.filled {
     fill: gray;
-    fill-opacity: 0.2
+}
+
+.option3.filled {
+    fill: green;
+}
+
+.option4.filled {
+    fill: firebrick;
 }
  
 .axis path,
@@ -45,13 +63,19 @@ var upperPercentile = (1 + percentile/100)/2
 var processedData = [];
 
 // Generate random gaussian data
-var data = d3.range(10000).map(d3.randomBates(10)).sort();
 var data1 = d3.range(10000).map(d3.randomBates(10)).sort();
-var data1 = data1.map(function(x) {
+var data2 = d3.range(10000).map(d3.randomBates(10)).sort();
+var data2 = data1.map(function(x) {
    return (x * 1.5) + 0.25; });
+var data3 = d3.range(10000).map(d3.randomBates(10)).sort();
+var data3 = data1.map(function(x) {
+   return (x * 1.2) - 0.25; });
+var data4 = d3.range(10000).map(d3.randomBates(10)).sort();
+var data4 = data1.map(function(x) {
+   return (x * 0.8) + 0.25; });
 
 // Combine data into an array
-var dataArray = [data, data1];
+var dataArray = [data1, data2, data3, data4];
 var dataFlattened = dataArray.reduce(function(a, b) {
   return a.concat(b); });
 
@@ -106,9 +130,9 @@ for (var i = 0; i < processedData.length; i++) {
 
     // Define line to display
     var	line = d3.line()
-    .curve(d3.curveBasis)
-    .x(function(d) { return x((d.x0+d.x1)/2); })
-    .y(function(d) { return y((d.length)/option.data.length); });
+        .curve(d3.curveBasis)
+        .x(function(d) { return x((d.x0+d.x1)/2); })
+        .y(function(d) { return y((d.length)/option.data.length); });
 
     // Add line to graph
     g.append("path")	
@@ -127,9 +151,36 @@ for (var i = 0; i < processedData.length; i++) {
     // Add filled area with clip
     g.append("path")	
         .attr("class", "option" + (i + 1) + " filled")
-        .attr("clip-path", function(d,j) { return "url(#clip" + (i + 1) + ")"; })
+        .attr("clip-path", "url(#clip" + (i + 1) + ")")
         .attr("d", line(option.bins));
+
+    // g.append("rect")
+    //     .attr("class", "option" + (i + 1) + " filled")
+    //     .attr("x", 1)
+    //     .attr("width", 30)
+    //     .attr("height", 30)
+    //     .attr("transform", "translate(700, " + (50 + 40*i) + ")");
 }
+
+var rect = g.selectAll("rect")
+    .data(processedData)
+    .enter()
+    .append("rect")
+        .attr("class", function(d,i) { return "option" + (i + 1) +  " filled" })
+        .attr("x", 1)
+        .attr("width", 30)
+        .attr("height", 30)
+        .attr("transform", function(d,i) { return "translate(700, " + (50 + 40*i) + ")"} );
+
+var text = g.selectAll("text")
+    .data(processedData)
+    .enter()
+    .append("text")
+        .attr("x", 745)
+        .attr("y", function(d,i) { return 70 + 40*i })
+        .text(function(d,i) { return "Option " + (i + 1) })
+        .attr("font-family", "sans-serif")
+        .attr("font-size", "15px")
 
 // Add axes to graph
 g.append("g")
